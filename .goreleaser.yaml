@@ -32,6 +32,8 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+      - "^chore:"
+      - "^build:"
 
 release:
   github:
