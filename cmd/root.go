@@ -45,6 +45,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(
 		NewMultiMergeCommand(),
+		NewVersionCommand(),
 	)
 
 	return rootCmd
