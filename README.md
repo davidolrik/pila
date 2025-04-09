@@ -1,6 +1,12 @@
 # Pila™ - Stack all the things!
 
+> [!WARNING]
+> This is a work in progress, everything might change
+
 ## Usage
+
+> [!NOTE]
+> Only `multi-merge` have been implemented for now
 
 ```sh
 # Show branch stack
