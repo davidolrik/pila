@@ -26,6 +26,30 @@ func Heads() (map[string]string, error) {
 	return heads, nil
 }
 
+func (r *LocalRepository) AllBranchNames() ([]string, error) {
+	branches := []string{}
+
+	output, err := r.ExecuteGitCommandQuiet("show-ref")
+	if err != nil {
+		return branches, nil
+	}
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		parts := strings.Split(line, " ")
+		if strings.HasPrefix(parts[1], "refs/heads/") {
+			parts[1] = strings.Replace(parts[1], "refs/heads/", "", 1)
+		} else if strings.HasPrefix(parts[1], "refs/remotes/") {
+			parts[1] = strings.Replace(parts[1], "refs/remotes/", "", 1)
+		} else {
+			continue
+		}
+		branches = append(branches, parts[1])
+	}
+
+	return branches, nil
+}
+
 func (r *LocalRepository) NamedBranches(ref string) (map[string]string, error) {
 	heads := make(map[string]string)
 

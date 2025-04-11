@@ -11,6 +11,29 @@ import (
 	"pila.dev/pila/internal/git"
 )
 
+func branchNameCompletions(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	repo, err := git.GetLocalRepository()
+	if err != nil {
+		panic(err)
+	}
+
+	// All branch names, both local and remote
+	suggestions := []string{}
+	validOptions, err := repo.AllBranchNames()
+	if err != nil {
+		return suggestions, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Filter suggestions based on what the user has typed
+	for _, option := range validOptions {
+		if strings.HasPrefix(option, toComplete) {
+			suggestions = append(suggestions, option)
+		}
+	}
+
+	return suggestions, cobra.ShellCompDirectiveNoFileComp
+}
+
 func NewMultiMergeCommand() *cobra.Command {
 	multiMergeCmd := &cobra.Command{
 		Use:     "multi-merge",
@@ -83,6 +106,7 @@ func NewMultiMergeCommand() *cobra.Command {
 			⚠️ the target branch will be deleted and recreated locally as a clean branch off of the main branch
 		`)),
 	)
+	multiMergeCmd.RegisterFlagCompletionFunc("target", branchNameCompletions)
 	multiMergeCmd.Flags().BoolP("force", "F", false, "Don't ask before deleting target branch")
 
 	multiMergeCmd.Flags().BoolP("append", "A", false, "Add reference to end of existing manifest")
@@ -96,6 +120,8 @@ func NewMultiMergeCommand() *cobra.Command {
 			Note that order matters
 		`)),
 	)
+	multiMergeCmd.RegisterFlagCompletionFunc("branch", branchNameCompletions)
+
 	multiMergeCmd.Flags().StringSliceP("label", "L", []string{}, strings.TrimSpace(dedent.Dedent(`
 			Labels on Merge requests to merge into target branch
 			Merge requests will be merged in order of their creation date
