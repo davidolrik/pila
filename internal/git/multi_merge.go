@@ -16,7 +16,7 @@ type MultiMergeDoneError struct{}
 
 func (r *LocalRepository) MultiMergeNamedBranches(target string, branchNames []string) (*MultiMergeManifest, error) {
 	// Make sure we have all changes
-	r.Doc("Make sure we have all changes")
+	r.Note("Make sure we have all changes")
 	fetchOutput, err := r.ExecuteGitCommand("fetch")
 	if err != nil {
 		return nil, err
@@ -59,16 +59,16 @@ func (r *LocalRepository) MultiMergeNamedBranches(target string, branchNames []s
 	// Check if target branch already exists, otherwise create it
 	_, err = r.ExecuteGitCommandQuiet("rev-parse", "--verify", target)
 	if err == nil {
-		r.Doc("Checkout target branch")
+		r.Note("Checkout target branch")
 		r.ExecuteGitCommand("checkout", target)
 
-		r.Doc("Make target branch point to %s", mainBranchName)
+		r.Note("Make target branch point to %s", mainBranchName)
 		_, err = r.ExecuteGitCommand("reset", "--hard", fmt.Sprintf("origin/%s", mainBranchName))
 		if err != nil {
 			return multiMergeManifest, err
 		}
 	} else {
-		r.Doc("Create target branch")
+		r.Note("Create target branch")
 		r.ExecuteGitCommand("checkout", "-b", target)
 	}
 
@@ -99,7 +99,7 @@ func (r *LocalRepository) MultiMergeUsingManifest() error {
 	manifest.Reset()
 
 	// Make sure we have all changes
-	r.Doc("Make sure we have all changes")
+	r.Note("Make sure we have all changes")
 	fetchOutput, err := r.ExecuteGitCommand("fetch")
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (r *LocalRepository) MultiMergeUsingManifest() error {
 	}
 
 	// Reset target branch
-	r.Doc("Checkout target branch")
+	r.Note("Checkout target branch")
 	r.ExecuteGitCommand("checkout", manifest.Target)
 
 	// Reset target branch to main
@@ -117,7 +117,7 @@ func (r *LocalRepository) MultiMergeUsingManifest() error {
 	if err != nil {
 		return err
 	}
-	r.Doc("Make target branch point to %s", mainBranchName)
+	r.Note("Make target branch point to %s", mainBranchName)
 	_, err = r.ExecuteGitCommand("reset", "--hard", fmt.Sprintf("origin/%s", mainBranchName))
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 		if reference.Merged {
 			// If this is the last branch and is has been merged return with success
 			if i == len(manifest.References)-1 {
-				r.Doc("Last has been merged")
+				r.Note("Last has been merged")
 				return manifest, nil
 			}
 			continue
@@ -174,7 +174,7 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 			commitMessageLines := strings.Split(strings.TrimSpace(string(commitMessageBytes)), "\n")
 			commitMessage := commitMessageLines[0]
 
-			r.Doc("Commit merge")
+			r.Note("Commit merge")
 			commitOutput, err := r.ExecuteGitCommand("commit", "-m", commitMessage)
 			if err != nil {
 				return manifest, err
@@ -185,7 +185,7 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 			reference.Merged = true
 			manifest.Save()
 		} else {
-			r.Doc("Merge branch %s into %s", reference.Name, manifest.Target)
+			r.Note("Merge branch %s into %s", reference.Name, manifest.Target)
 
 			// Get list of heads matching the branch we want to merge
 			heads, err := r.NamedBranches(reference.Name)
@@ -232,7 +232,7 @@ func (r *LocalRepository) MultiMergeAbort() error {
 
 	// Abort any running merges
 	if branchName, err := r.OngoingMergeBranchName(); err == nil && branchName != "" {
-		r.Doc("Aborting merge")
+		r.Note("Aborting merge")
 		output, err := r.ExecuteGitCommand("merge", "--abort")
 		if err != nil {
 			panic(err)
@@ -252,7 +252,7 @@ func (r *LocalRepository) MultiMergeAbort() error {
 }
 
 func (r *LocalRepository) MultiMergeCommitManifest() error {
-	r.Doc("Adding manifest to git")
+	r.Note("Adding manifest to git")
 	output, err := r.ExecuteGitCommand("add", ".pila_multi_merge.yaml")
 	if err != nil {
 		return err
@@ -261,7 +261,7 @@ func (r *LocalRepository) MultiMergeCommitManifest() error {
 		fmt.Println(output)
 	}
 
-	r.Doc("Committing manifest to git")
+	r.Note("Committing manifest to git")
 	output, err = r.ExecuteGitCommand("commit", "-m", "chore: Add Pila multi merge manifest")
 	if err != nil {
 		return err

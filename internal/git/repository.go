@@ -37,9 +37,19 @@ func GetLocalRepository() (*LocalRepository, error) {
 	return repo, nil
 }
 
-func (r *LocalRepository) Doc(format string, arg ...any) {
+func (r *LocalRepository) Note(format string, arg ...any) {
 	format = fmt.Sprintf("\n# %s", format)
 	fmt.Println(color.HiBlackString(fmt.Sprintf(format,arg...)))
+}
+
+func (r *LocalRepository) Warn(format string, arg ...any) {
+	format = fmt.Sprintf("\n# %s", format)
+	fmt.Println(color.HiYellowString(fmt.Sprintf(format,arg...)))
+}
+
+func (r *LocalRepository) Err(format string, arg ...any) {
+	format = fmt.Sprintf("\n# %s", format)
+	fmt.Println(color.HiRedString(fmt.Sprintf(format,arg...)))
 }
 
 func (r *LocalRepository) ExecuteGitCommand(arg ...string) (string, error) {

@@ -55,7 +55,6 @@ func (r *LocalRepository) NamedBranches(ref string) (map[string]string, error) {
 
 	output, err := r.ExecuteGitCommandQuiet("show-ref", "--no-tags", ref)
 	if err != nil {
-		fmt.Println(err.Error())
 		return heads, err
 	}
 
