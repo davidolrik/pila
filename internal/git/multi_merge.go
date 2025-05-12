@@ -154,7 +154,7 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 	}
 
 	// Find first merge that isn't merged yet
-	for i := range manifest.References {
+	for i := 0; i < len(manifest.References); i++ {
 		reference := &manifest.References[i]
 		if reference.Merged {
 			// If this is the last branch and is has been merged return with success
@@ -190,7 +190,11 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 			// Get list of heads matching the branch we want to merge
 			heads, err := r.NamedBranches(reference.Name)
 			if err != nil {
-				return manifest, err
+				r.Warn("Branch %s does not exist, skipping", reference.Name)
+				manifest.References = append(manifest.References[:i], manifest.References[i+1:]...)
+				i = i - 1
+				manifest.Save()
+				continue
 			}
 
 			// Figure out which branch to merge local or remote (local preferred)
