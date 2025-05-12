@@ -30,10 +30,6 @@ func (r *LocalRepository) MultiMergeNamedBranches(target string, branchNames []s
 	if err != nil {
 		return nil, err
 	}
-	_, err = r.ExecuteGitCommandQuiet("checkout", mainBranchName)
-	if err != nil {
-		return nil, err
-	}
 
 	// Create todo list
 	mainSha, err := r.ExecuteGitCommandQuiet("rev-parse", "--verify", mainBranchName)
@@ -199,10 +195,10 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 
 			// Figure out which branch to merge local or remote (local preferred)
 			branchNameToMerge := ""
-			if _, exists := heads[reference.Name]; exists {
-				branchNameToMerge = reference.Name
-			} else if _, exists := heads[fmt.Sprintf("origin/%s", reference.Name)]; exists {
+			if _, exists := heads[fmt.Sprintf("origin/%s", reference.Name)]; exists {
 				branchNameToMerge = fmt.Sprintf("origin/%s", reference.Name)
+			} else if _, exists := heads[reference.Name]; exists {
+				branchNameToMerge = reference.Name
 			} else {
 				return manifest, fmt.Errorf("unable to find a branch named '%s'", reference.Name)
 			}
