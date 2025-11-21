@@ -11,6 +11,29 @@ import (
 	"pila.dev/pila/internal/git"
 )
 
+func handleMultiMergeError(err error) {
+	if err == nil {
+		return
+	}
+
+	// Check if this is a merge conflict error
+	var conflictErr *git.MultiMergeConflictError
+	if errors.As(err, &conflictErr) {
+		fmt.Println()
+		fmt.Println(color.RedString("Merge conflict detected!"))
+		fmt.Println()
+		fmt.Printf("A merge conflict occurred while merging branch %s\n", color.CyanString(conflictErr.BranchName))
+		fmt.Println()
+		fmt.Println("To resolve:")
+		fmt.Println("  1. Fix the conflicts in your working directory")
+		fmt.Println("  2. Stage the resolved files with " + color.GreenString("git add <files>"))
+		fmt.Println("  3. Continue the multi-merge with " + color.GreenString("pila multi-merge continue"))
+		fmt.Println()
+		fmt.Println("Or abort the multi-merge with " + color.YellowString("pila multi-merge abort"))
+		fmt.Println()
+	}
+}
+
 func branchNameCompletions(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	repo, err := git.GetLocalRepository()
 	if err != nil {
@@ -91,12 +114,14 @@ func NewMultiMergeCommand() *cobra.Command {
 				}
 
 				_, err := repo.MultiMergeNamedBranches(target, branches)
+				handleMultiMergeError(err)
 				cobra.CheckErr(err)
 			} else if len(labels) > 0 {
 				err := repo.MultiMergeNamedLabels(target, labels)
 				cobra.CheckErr(err)
 			} else {
 				err := repo.MultiMergeUsingManifest()
+				handleMultiMergeError(err)
 				cobra.CheckErr(err)
 			}
 		},
@@ -155,6 +180,7 @@ func NewMultiMergeContinueCommand() *cobra.Command {
 
 			for {
 				manifest, err := repo.MultiMergeNamedContinue()
+				handleMultiMergeError(err)
 				cobra.CheckErr(err)
 				if manifest.IsDone() {
 					break

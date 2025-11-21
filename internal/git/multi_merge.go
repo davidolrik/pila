@@ -14,6 +14,16 @@ const (
 
 type MultiMergeDoneError struct{}
 
+// MultiMergeConflictError is returned when a merge conflict occurs during multi-merge
+type MultiMergeConflictError struct {
+	BranchName string
+	Manifest   *MultiMergeManifest
+}
+
+func (e *MultiMergeConflictError) Error() string {
+	return fmt.Sprintf("merge conflict occurred while merging branch '%s'", e.BranchName)
+}
+
 func (r *LocalRepository) MultiMergeNamedBranches(target string, branchNames []string) (*MultiMergeManifest, error) {
 	// Make sure we have all changes
 	r.Note("Make sure we have all changes")
@@ -208,6 +218,13 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 				fmt.Println(mergeOutput)
 			}
 			if err != nil {
+				// Check if this is a merge conflict by checking if MERGE_HEAD exists
+				if _, statErr := os.Stat(".git/MERGE_HEAD"); statErr == nil {
+					return manifest, &MultiMergeConflictError{
+						BranchName: branchNameToMerge,
+						Manifest:   manifest,
+					}
+				}
 				return manifest, err
 			}
 			reference.Merged = true
