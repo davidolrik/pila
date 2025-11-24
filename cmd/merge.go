@@ -34,6 +34,13 @@ func handleMultiMergeError(err error) {
 	}
 }
 
+func checkOngoingMerge(repo *git.LocalRepository) error {
+	if branchName, err := repo.OngoingMergeBranchName(); err == nil && branchName != "" {
+		return fmt.Errorf("a merge is currently in progress, please run 'pila multi-merge continue' or 'pila multi-merge abort' first")
+	}
+	return nil
+}
+
 func branchNameCompletions(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	repo, err := git.GetLocalRepository()
 	if err != nil {
@@ -77,6 +84,10 @@ func NewMultiMergeCommand() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
+
+			// Check if there's an ongoing merge
+			err = checkOngoingMerge(repo)
+			cobra.CheckErr(err)
 
 			// Load previous manifest if needed
 			manifest, _ := git.LoadMultiMergeManifest()
@@ -224,6 +235,10 @@ func NewMultiMergeRedoCommand() *cobra.Command {
 				panic(err)
 			}
 
+			// Check if there's an ongoing merge
+			err = checkOngoingMerge(repo)
+			cobra.CheckErr(err)
+
 			err = repo.MultiMergeUsingManifest()
 			handleMultiMergeError(err)
 			cobra.CheckErr(err)
@@ -249,6 +264,10 @@ func NewMultiMergeAppendCommand() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
+
+			// Check if there's an ongoing merge
+			err = checkOngoingMerge(repo)
+			cobra.CheckErr(err)
 
 			// Load existing manifest
 			manifest, err := git.LoadMultiMergeManifest()
@@ -307,6 +326,10 @@ func NewMultiMergePrependCommand() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
+
+			// Check if there's an ongoing merge
+			err = checkOngoingMerge(repo)
+			cobra.CheckErr(err)
 
 			// Load existing manifest
 			manifest, err := git.LoadMultiMergeManifest()
