@@ -1,0 +1,32 @@
+[tools]
+go = "1.25.4"
+node = "24"
+prek = "latest"
+
+[tasks.help]
+description = "📚 Help"
+alias = "default"
+run = '''# mise tasks --local
+    echo " ____  _ _       "
+    echo "|  _ \(_) | __ _ "
+    echo "| |_) | | |/ _\` |"
+    echo "|  __/| | | (_| |"
+    echo "|_|   |_|_|\__,_|"
+    echo "Stack all the things™"
+    echo ""
+    mise tasks --local
+'''
+
+[tasks."prerequisites"]
+description = "Setup git pre-commit hook"
+run = ["git config --unset-all core.hooksPath || true", "rm -f .git/hooks/pre-commit*", "prek install"]
+
+[tasks.build]
+description = "🛠️  Build binary"
+depends = "prerequisites"
+run = ["go generate ./...", "go mod tidy", "go build -o pila ."]
+
+[tasks."lint"]
+description = "Lint all markdown files"
+raw = true
+run = "prek run --all-files markdownlint-cli2"
