@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/jedib0t/go-pretty/v6/text"
-	"pila.dev/pila/cmd"
+	"pila.olrik.dev/cmd"
 )
 
 

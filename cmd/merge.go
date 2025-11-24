@@ -8,7 +8,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	"pila.dev/pila/internal/git"
+	"pila.olrik.dev/internal/git"
 )
 
 func handleMultiMergeError(err error) {
