@@ -59,7 +59,7 @@ func (r *LocalRepository) MultiMergeNamedBranches(target string, branchNames []s
 			Name: branchName,
 		})
 	}
-	// Delete any existing manifest, to prevent it from interferring with the creation/checkout of the target branch
+	// Delete any existing manifest, to prevent it from interfering with the creation/checkout of the target branch
 	multiMergeManifest.Remove()
 
 	// Check if target branch already exists, otherwise create it

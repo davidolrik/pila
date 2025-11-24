@@ -22,7 +22,7 @@ func (r *LocalRepository) RunHook(hookFile string, arg ...string) error {
 
 	_, err = os.Stat(hookFile)
 	if err == nil {
-		r.Note("Running hook after all merges completed succesfully")
+		r.Note("Running hook after all merges completed successfully")
 		cmd := exec.Command(hookFile, arg...)
 		output, err := cmd.Output()
 		if err != nil {

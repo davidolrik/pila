@@ -8,7 +8,6 @@ import (
 	"pila.olrik.dev/cmd"
 )
 
-
 func main() {
 	text.EnableColors()
 
