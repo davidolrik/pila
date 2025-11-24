@@ -90,38 +90,12 @@ func NewMultiMergeCommand() *cobra.Command {
 				cobra.CheckErr(err)
 			}
 
-			appendReferences, _ := cmd.Flags().GetBool("append")
-			prependReferences, _ := cmd.Flags().GetBool("prepend")
 			if len(branches) > 0 {
-				if appendReferences || prependReferences {
-					manifest, err := git.LoadMultiMergeManifest()
-					cobra.CheckErr(err)
-					if manifest.Type != git.MULTI_MERGE_MANIFEST_TYPE_BRANCHES {
-						err := fmt.Errorf("manifest is not of type branches")
-						cobra.CheckErr(err)
-					}
-
-					existingBranches := []string{}
-					for _, reference := range manifest.References {
-						existingBranches = append(existingBranches, reference.Name)
-					}
-
-					if appendReferences {
-						branches = append(existingBranches, branches...)
-					} else if prependReferences {
-						branches = append(branches, existingBranches...)
-					}
-				}
-
 				_, err := repo.MultiMergeNamedBranches(target, branches)
 				handleMultiMergeError(err)
 				cobra.CheckErr(err)
 			} else if len(labels) > 0 {
 				err := repo.MultiMergeNamedLabels(target, labels)
-				cobra.CheckErr(err)
-			} else {
-				err := repo.MultiMergeUsingManifest()
-				handleMultiMergeError(err)
 				cobra.CheckErr(err)
 			}
 		},
@@ -133,12 +107,6 @@ func NewMultiMergeCommand() *cobra.Command {
 	)
 	multiMergeCmd.RegisterFlagCompletionFunc("target", branchNameCompletions)
 	multiMergeCmd.Flags().BoolP("force", "F", false, "Don't ask before deleting target branch")
-
-	multiMergeCmd.Flags().BoolP("append", "A", false, "Add reference to end of existing manifest")
-	multiMergeCmd.Flags().BoolP("prepend", "P", false, "Add reference to start of existing manifest")
-	multiMergeCmd.Flags().Bool("redo", false, "Redo stack using existing manifest")
-
-	multiMergeCmd.MarkFlagsMutuallyExclusive("append", "prepend", "redo")
 
 	multiMergeCmd.Flags().StringSliceP("branch", "B", []string{}, strings.TrimSpace(dedent.Dedent(`
 			Branches to merge into target branch
@@ -155,11 +123,14 @@ func NewMultiMergeCommand() *cobra.Command {
 
 	multiMergeCmd.MarkFlagsMutuallyExclusive("branch", "label")
 
-	multiMergeCmd.MarkFlagsOneRequired("branch", "label", "append", "prepend", "redo")
+	multiMergeCmd.MarkFlagsOneRequired("branch", "label")
 
 	multiMergeCmd.AddCommand(NewMultiMergeAbortCommand())
 	multiMergeCmd.AddCommand(NewMultiMergeContinueCommand())
 	multiMergeCmd.AddCommand(NewMultiMergeShowCommand())
+	multiMergeCmd.AddCommand(NewMultiMergeRedoCommand())
+	multiMergeCmd.AddCommand(NewMultiMergeAppendCommand())
+	multiMergeCmd.AddCommand(NewMultiMergePrependCommand())
 
 	return multiMergeCmd
 }
@@ -235,4 +206,144 @@ func NewMultiMergeShowCommand() *cobra.Command {
 		},
 	}
 	return multiMergeShowCmd
+}
+
+func NewMultiMergeRedoCommand() *cobra.Command {
+	multiMergeRedoCmd := &cobra.Command{
+		Use:     "redo",
+		Aliases: []string{},
+		Short:   "Redo multi-merge using existing manifest",
+		Long: strings.TrimSpace(dedent.Dedent(`
+			Load the existing manifest and reapply all merges from scratch.
+			This resets the target branch to the main branch and re-merges all branches in order.
+		`)),
+		Run: func(cmd *cobra.Command, args []string) {
+			// Get handle on local repo
+			repo, err := git.GetLocalRepository()
+			if err != nil {
+				panic(err)
+			}
+
+			err = repo.MultiMergeUsingManifest()
+			handleMultiMergeError(err)
+			cobra.CheckErr(err)
+		},
+	}
+	return multiMergeRedoCmd
+}
+
+func NewMultiMergeAppendCommand() *cobra.Command {
+	multiMergeAppendCmd := &cobra.Command{
+		Use:     "append",
+		Aliases: []string{},
+		Short:   "Append branches to existing multi-merge manifest",
+		Long: strings.TrimSpace(dedent.Dedent(`
+			Add branches to the end of the existing multi-merge manifest and merge them.
+		`)),
+		Run: func(cmd *cobra.Command, args []string) {
+			branches, _ := cmd.Flags().GetStringSlice("branch")
+			target, _ := cmd.Flags().GetString("target")
+
+			// Get handle on local repo
+			repo, err := git.GetLocalRepository()
+			if err != nil {
+				panic(err)
+			}
+
+			// Load existing manifest
+			manifest, err := git.LoadMultiMergeManifest()
+			cobra.CheckErr(err)
+
+			if manifest.Type != git.MULTI_MERGE_MANIFEST_TYPE_BRANCHES {
+				err := fmt.Errorf("manifest is not of type branches")
+				cobra.CheckErr(err)
+			}
+
+			// Use target from manifest if not specified
+			if target == "" {
+				target = manifest.Target
+			}
+
+			// Get existing branches from manifest
+			existingBranches := []string{}
+			for _, reference := range manifest.References {
+				existingBranches = append(existingBranches, reference.Name)
+			}
+
+			// Append new branches to existing ones
+			allBranches := append(existingBranches, branches...)
+
+			_, err = repo.MultiMergeNamedBranches(target, allBranches)
+			handleMultiMergeError(err)
+			cobra.CheckErr(err)
+		},
+	}
+	multiMergeAppendCmd.Flags().StringSliceP("branch", "B", []string{}, strings.TrimSpace(dedent.Dedent(`
+		Branches to append to the existing manifest
+	`)))
+	multiMergeAppendCmd.RegisterFlagCompletionFunc("branch", branchNameCompletions)
+	multiMergeAppendCmd.MarkFlagRequired("branch")
+
+	multiMergeAppendCmd.Flags().StringP("target", "T", "", "Target branch (inherits from manifest if not specified)")
+	multiMergeAppendCmd.RegisterFlagCompletionFunc("target", branchNameCompletions)
+
+	return multiMergeAppendCmd
+}
+
+func NewMultiMergePrependCommand() *cobra.Command {
+	multiMergePrependCmd := &cobra.Command{
+		Use:     "prepend",
+		Aliases: []string{},
+		Short:   "Prepend branches to existing multi-merge manifest",
+		Long: strings.TrimSpace(dedent.Dedent(`
+			Add branches to the start of the existing multi-merge manifest and merge them.
+		`)),
+		Run: func(cmd *cobra.Command, args []string) {
+			branches, _ := cmd.Flags().GetStringSlice("branch")
+			target, _ := cmd.Flags().GetString("target")
+
+			// Get handle on local repo
+			repo, err := git.GetLocalRepository()
+			if err != nil {
+				panic(err)
+			}
+
+			// Load existing manifest
+			manifest, err := git.LoadMultiMergeManifest()
+			cobra.CheckErr(err)
+
+			if manifest.Type != git.MULTI_MERGE_MANIFEST_TYPE_BRANCHES {
+				err := fmt.Errorf("manifest is not of type branches")
+				cobra.CheckErr(err)
+			}
+
+			// Use target from manifest if not specified
+			if target == "" {
+				target = manifest.Target
+			}
+
+			// Get existing branches from manifest
+			existingBranches := []string{}
+			for _, reference := range manifest.References {
+				existingBranches = append(existingBranches, reference.Name)
+			}
+
+			// Prepend new branches before existing ones
+			allBranches := append(branches, existingBranches...)
+
+			_, err = repo.MultiMergeNamedBranches(target, allBranches)
+			handleMultiMergeError(err)
+			cobra.CheckErr(err)
+		},
+	}
+	multiMergePrependCmd.Flags().StringSliceP("branch", "B", []string{}, strings.TrimSpace(dedent.Dedent(`
+		Branches to prepend to the existing manifest
+	`)))
+	multiMergePrependCmd.RegisterFlagCompletionFunc("branch", branchNameCompletions)
+	multiMergePrependCmd.MarkFlagRequired("branch")
+
+	multiMergePrependCmd.Flags().StringP("target", "T", "", "Target branch (inherits from manifest if not specified)")
+	multiMergePrependCmd.RegisterFlagCompletionFunc("target", branchNameCompletions)
+
+	return multiMergePrependCmd
 }
