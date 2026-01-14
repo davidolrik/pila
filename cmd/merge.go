@@ -142,6 +142,7 @@ func NewMultiMergeCommand() *cobra.Command {
 	multiMergeCmd.AddCommand(NewMultiMergeRedoCommand())
 	multiMergeCmd.AddCommand(NewMultiMergeAppendCommand())
 	multiMergeCmd.AddCommand(NewMultiMergePrependCommand())
+	multiMergeCmd.AddCommand(NewMultiMergeRemoveCommand())
 
 	return multiMergeCmd
 }
@@ -369,4 +370,63 @@ func NewMultiMergePrependCommand() *cobra.Command {
 	multiMergePrependCmd.RegisterFlagCompletionFunc("target", branchNameCompletions)
 
 	return multiMergePrependCmd
+}
+
+func manifestBranchCompletions(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Load manifest to get branches
+	manifest, err := git.LoadMultiMergeManifest()
+	if err != nil || manifest == nil {
+		return []string{}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	suggestions := []string{}
+	for _, reference := range manifest.References {
+		if strings.HasPrefix(reference.Name, toComplete) {
+			suggestions = append(suggestions, reference.Name)
+		}
+	}
+
+	return suggestions, cobra.ShellCompDirectiveNoFileComp
+}
+
+func NewMultiMergeRemoveCommand() *cobra.Command {
+	multiMergeRemoveCmd := &cobra.Command{
+		Use:   "remove <branch>",
+		Short: "Remove a branch from the multi-merge manifest",
+		Long: strings.TrimSpace(dedent.Dedent(`
+			Remove a branch from the existing multi-merge manifest.
+			The manifest is modified but not committed.
+		`)),
+		Args: cobra.ExactArgs(1),
+		ValidArgsFunction: manifestBranchCompletions,
+		Run: func(cmd *cobra.Command, args []string) {
+			branchToRemove := args[0]
+
+			// Load existing manifest
+			manifest, err := git.LoadMultiMergeManifest()
+			cobra.CheckErr(err)
+
+			// Find and remove the branch
+			found := false
+			for i, reference := range manifest.References {
+				if reference.Name == branchToRemove {
+					manifest.References = append(manifest.References[:i], manifest.References[i+1:]...)
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				err := fmt.Errorf("branch %s not found in manifest", branchToRemove)
+				cobra.CheckErr(err)
+			}
+
+			// Save the manifest (without committing)
+			err = manifest.Save()
+			cobra.CheckErr(err)
+
+			fmt.Printf("Removed %s from manifest\n", color.CyanString(branchToRemove))
+		},
+	}
+	return multiMergeRemoveCmd
 }
