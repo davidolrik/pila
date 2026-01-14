@@ -24,6 +24,15 @@ func (e *MultiMergeConflictError) Error() string {
 	return fmt.Sprintf("merge conflict occurred while merging branch '%s'", e.BranchName)
 }
 
+// LocalOnlyBranchesError is returned when branches exist only locally
+type LocalOnlyBranchesError struct {
+	BranchNames []string
+}
+
+func (e *LocalOnlyBranchesError) Error() string {
+	return fmt.Sprintf("branches exist only locally: %s", strings.Join(e.BranchNames, ", "))
+}
+
 func (r *LocalRepository) MultiMergeNamedBranches(target string, branchNames []string) (*MultiMergeManifest, error) {
 	// Make sure we have all changes
 	r.Note("Make sure we have all changes")
@@ -112,6 +121,21 @@ func (r *LocalRepository) MultiMergeUsingManifest() error {
 	}
 	if fetchOutput != "" {
 		fmt.Println(fetchOutput)
+	}
+
+	// Check for local-only branches before making changes
+	branchNames := make([]string, len(manifest.References))
+	for i, ref := range manifest.References {
+		branchNames[i] = ref.Name
+	}
+
+	localOnlyBranches, err := r.CheckBranchesHaveRemotes(branchNames)
+	if err != nil {
+		return err
+	}
+
+	if len(localOnlyBranches) > 0 {
+		return &LocalOnlyBranchesError{BranchNames: localOnlyBranches}
 	}
 
 	// Reset target branch

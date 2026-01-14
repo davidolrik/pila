@@ -32,6 +32,30 @@ func handleMultiMergeError(err error) {
 		fmt.Println("Or abort the multi-merge with " + color.YellowString("pila multi-merge abort"))
 		fmt.Println()
 	}
+
+	// Check if this is a local-only branches error
+	var localOnlyErr *git.LocalOnlyBranchesError
+	if errors.As(err, &localOnlyErr) {
+		fmt.Println()
+		fmt.Println(color.RedString("Cannot redo: some branches only exist locally"))
+		fmt.Println()
+		fmt.Println("The following branches have no remote tracking branch:")
+		for _, branchName := range localOnlyErr.BranchNames {
+			fmt.Printf("  - %s\n", color.CyanString(branchName))
+		}
+		fmt.Println()
+		fmt.Println("To resolve, either:")
+		fmt.Println("  1. Push the branch(es) to remote:")
+		for _, branchName := range localOnlyErr.BranchNames {
+			fmt.Printf("     %s\n", color.GreenString("git push -u origin %s", branchName))
+		}
+		fmt.Println()
+		fmt.Println("  2. Remove the branch(es) from the manifest:")
+		for _, branchName := range localOnlyErr.BranchNames {
+			fmt.Printf("     %s\n", color.YellowString("pila multi-merge remove %s", branchName))
+		}
+		fmt.Println()
+	}
 }
 
 func checkOngoingMerge(repo *git.LocalRepository) error {

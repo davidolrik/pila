@@ -69,6 +69,28 @@ func (r *LocalRepository) NamedBranches(ref string) (map[string]string, error) {
 	return heads, nil
 }
 
+// CheckBranchesHaveRemotes returns branch names that exist only locally (no origin/)
+func (r *LocalRepository) CheckBranchesHaveRemotes(branchNames []string) ([]string, error) {
+	localOnlyBranches := []string{}
+
+	for _, branchName := range branchNames {
+		heads, err := r.NamedBranches(branchName)
+		if err != nil {
+			continue // Branch doesn't exist at all
+		}
+
+		remoteBranchName := fmt.Sprintf("origin/%s", branchName)
+		_, hasRemote := heads[remoteBranchName]
+		_, hasLocal := heads[branchName]
+
+		if hasLocal && !hasRemote {
+			localOnlyBranches = append(localOnlyBranches, branchName)
+		}
+	}
+
+	return localOnlyBranches, nil
+}
+
 func (r *LocalRepository) MainBranchName() (string, error) {
 	output, err := r.ExecuteGitCommandQuiet("rev-parse", "--abbrev-ref", "origin/HEAD")
 	if err != nil {
