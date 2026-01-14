@@ -3,6 +3,10 @@ go = "1.25.4"
 node = "24"
 prek = "latest"
 
+[hooks]
+# Setup git pre-commit hook
+postinstall = ["git config --unset-all core.hooksPath || true", "rm -f .git/hooks/pre-commit*", "prek install"]
+
 [tasks.help]
 description = "📚 Help"
 alias = "default"
@@ -17,13 +21,8 @@ run = '''# mise tasks --local
     mise tasks --local
 '''
 
-[tasks."prerequisites"]
-description = "Setup git pre-commit hook"
-run = ["git config --unset-all core.hooksPath || true", "rm -f .git/hooks/pre-commit*", "prek install"]
-
 [tasks.build]
 description = "🛠️  Build binary"
-depends = "prerequisites"
 run = ["go generate ./...", "go mod tidy", "go build -o pila ."]
 
 [tasks."lint"]
