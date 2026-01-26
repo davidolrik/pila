@@ -265,10 +265,10 @@ func (r *LocalRepository) MultiMergeNamedContinue() (*MultiMergeManifest, error)
 }
 
 func (r *LocalRepository) MultiMergeAbort() error {
-	// Load the manifest and reset all branches to unmerged
+	// Load the manifest at the start so we can restore it after reset
 	manifest, err := LoadMultiMergeManifest()
 	if err != nil {
-		manifest.Reset()
+		return err
 	}
 
 	// Abort any running merges
@@ -281,15 +281,27 @@ func (r *LocalRepository) MultiMergeAbort() error {
 		fmt.Println(output)
 	}
 
-	// Remove what ever we tried to merge
+	// Ensure we're on the target branch
+	r.Note("Checkout target branch")
+	_, err = r.ExecuteGitCommand("checkout", manifest.Target)
+	if err != nil {
+		return err
+	}
+
+	// Reset target branch to main
 	mainBranchName, err := r.MainBranchName()
 	if err != nil {
 		panic(err)
 	}
 	output, err := r.ExecuteGitCommand("reset", "--hard", fmt.Sprintf("origin/%s", mainBranchName))
 	fmt.Println(output)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Reset manifest state (mark all branches as unmerged) and save it
+	manifest.Reset()
+	return manifest.Save()
 }
 
 func (r *LocalRepository) MultiMergeCommitManifest() error {
