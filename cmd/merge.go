@@ -331,8 +331,18 @@ func NewMultiMergeAppendCommand() *cobra.Command {
 				existingBranches = append(existingBranches, reference.Name)
 			}
 
+			// Filter out branches already in manifest
+			newBranches, duplicates := filterDuplicateBranches(existingBranches, branches)
+			for _, dup := range duplicates {
+				fmt.Println(color.YellowString("%s is already in manifest, skipping", dup))
+			}
+			if len(newBranches) == 0 {
+				fmt.Println("No new branches to add")
+				return
+			}
+
 			// Append new branches to existing ones
-			allBranches := append(existingBranches, branches...)
+			allBranches := append(existingBranches, newBranches...)
 
 			_, err = repo.MultiMergeNamedBranches(target, allBranches)
 			handleMultiMergeError(err)
