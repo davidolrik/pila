@@ -304,6 +304,137 @@ func (r *LocalRepository) MultiMergeAbort() error {
 	return manifest.Save()
 }
 
+type MultiMergeTestBranchResult struct {
+	Name             string   `json:"name"`
+	Status           string   `json:"status"`                      // "clean", "conflict", "missing"
+	MergeType        string   `json:"merge_type,omitempty"`        // "sequential" or "main-only"
+	ConflictingFiles []string `json:"conflicting_files,omitempty"` // only when Status == "conflict"
+}
+
+type MultiMergeTestResult struct {
+	OK            bool                          `json:"ok"`
+	BranchResults []MultiMergeTestBranchResult `json:"branches"`
+}
+
+func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
+	manifest, err := LoadMultiMergeManifest()
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch latest changes
+	r.Note("Make sure we have all changes")
+	fetchOutput, err := r.ExecuteGitCommand("fetch")
+	if err != nil {
+		return nil, err
+	}
+	if fetchOutput != "" {
+		fmt.Println(fetchOutput)
+	}
+
+	// Save current branch name
+	originalBranch, err := r.ExecuteGitCommandQuiet("rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+
+	mainBranchName, err := r.MainBranchName()
+	if err != nil {
+		return nil, err
+	}
+
+	// Checkout detached HEAD at origin/<main>
+	r.Note("Checkout detached HEAD at origin/%s", mainBranchName)
+	_, err = r.ExecuteGitCommand("checkout", "--detach", fmt.Sprintf("origin/%s", mainBranchName))
+	if err != nil {
+		// Restore original branch before returning
+		r.ExecuteGitCommandQuiet("checkout", originalBranch)
+		return nil, err
+	}
+
+	result := &MultiMergeTestResult{
+		OK:            true,
+		BranchResults: []MultiMergeTestBranchResult{},
+	}
+	sequential := true
+
+	for _, reference := range manifest.References {
+		// Resolve branch name (prefer origin/<branch> over local)
+		heads, err := r.NamedBranches(reference.Name)
+		if err != nil {
+			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
+				Name:   reference.Name,
+				Status: "missing",
+			})
+			continue
+		}
+
+		branchNameToMerge := ""
+		if _, exists := heads[fmt.Sprintf("origin/%s", reference.Name)]; exists {
+			branchNameToMerge = fmt.Sprintf("origin/%s", reference.Name)
+		} else if _, exists := heads[reference.Name]; exists {
+			branchNameToMerge = reference.Name
+		} else {
+			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
+				Name:   reference.Name,
+				Status: "missing",
+			})
+			continue
+		}
+
+		// If a prior branch conflicted, reset to main for a clean "branch vs main" test
+		if !sequential {
+			r.ExecuteGitCommandQuiet("reset", "--hard", fmt.Sprintf("origin/%s", mainBranchName))
+		}
+
+		mergeType := "sequential"
+		if !sequential {
+			mergeType = "main-only"
+		}
+
+		r.Note("Test merge %s (%s)", reference.Name, mergeType)
+		_, mergeErr := r.ExecuteGitCommand("merge", "--no-ff", "--no-commit", branchNameToMerge)
+
+		if mergeErr == nil {
+			// Clean merge
+			if sequential {
+				// Commit to advance the base for subsequent branches
+				r.ExecuteGitCommandQuiet("commit", "-m", fmt.Sprintf("test merge %s", reference.Name))
+			} else {
+				r.ExecuteGitCommandQuiet("merge", "--abort")
+			}
+			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
+				Name:      reference.Name,
+				Status:    "clean",
+				MergeType: mergeType,
+			})
+		} else {
+			// Check if this is actually a merge conflict
+			conflictingFiles := []string{}
+			filesOutput, filesErr := r.ExecuteGitCommandQuiet("diff", "--name-only", "--diff-filter=U")
+			if filesErr == nil && filesOutput != "" {
+				conflictingFiles = strings.Split(filesOutput, "\n")
+			}
+
+			r.ExecuteGitCommandQuiet("merge", "--abort")
+			sequential = false
+			result.OK = false
+			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
+				Name:             reference.Name,
+				Status:           "conflict",
+				MergeType:        mergeType,
+				ConflictingFiles: conflictingFiles,
+			})
+		}
+	}
+
+	// Restore original state
+	r.Note("Restore original branch")
+	r.ExecuteGitCommand("checkout", originalBranch)
+
+	return result, nil
+}
+
 func (r *LocalRepository) MultiMergeCommitManifest() error {
 	r.Note("Adding manifest to git")
 	output, err := r.ExecuteGitCommand("add", ".pila_multi_merge.yaml")

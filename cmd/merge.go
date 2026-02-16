@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/fatih/color"
@@ -185,6 +187,7 @@ func NewMultiMergeCommand() *cobra.Command {
 	multiMergeCmd.AddCommand(NewMultiMergeAppendCommand())
 	multiMergeCmd.AddCommand(NewMultiMergePrependCommand())
 	multiMergeCmd.AddCommand(NewMultiMergeRemoveCommand())
+	multiMergeCmd.AddCommand(NewMultiMergeTestCommand())
 
 	return multiMergeCmd
 }
@@ -449,6 +452,68 @@ func manifestBranchCompletions(cmd *cobra.Command, args []string, toComplete str
 	}
 
 	return suggestions, cobra.ShellCompDirectiveNoFileComp
+}
+
+func NewMultiMergeTestCommand() *cobra.Command {
+	multiMergeTestCmd := &cobra.Command{
+		Use:   "test",
+		Short: "Test if all branches in the manifest merge cleanly",
+		Long: strings.TrimSpace(dedent.Dedent(`
+			Simulate the multi-merge process and report which branches
+			merge cleanly and which have conflicts, without modifying any branches.
+		`)),
+		Run: func(cmd *cobra.Command, args []string) {
+			jsonOutput, _ := cmd.Flags().GetBool("json")
+
+			// Get handle on local repo
+			repo, err := git.GetLocalRepository()
+			if err != nil {
+				panic(err)
+			}
+
+			// Check if there's an ongoing merge
+			err = checkOngoingMerge(repo)
+			cobra.CheckErr(err)
+
+			result, err := repo.MultiMergeTest()
+			cobra.CheckErr(err)
+
+			if jsonOutput {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				enc.Encode(result)
+			} else {
+				fmt.Println()
+				for _, br := range result.BranchResults {
+					switch br.Status {
+					case "clean":
+						fmt.Printf("%s %s\n", color.GreenString(br.Name), color.HiBlackString("(%s)", br.MergeType))
+					case "conflict":
+						fmt.Printf("%s %s\n", color.RedString(br.Name), color.HiBlackString("(%s)", br.MergeType))
+						for _, f := range br.ConflictingFiles {
+							fmt.Printf("  %s\n", f)
+						}
+					case "missing":
+						fmt.Printf("%s %s\n", color.YellowString(br.Name), color.HiBlackString("(missing)"))
+					}
+				}
+				fmt.Println()
+
+				if result.OK {
+					fmt.Println(color.GreenString("All branches merge cleanly."))
+				} else {
+					fmt.Println(color.RedString("Some branches have conflicts."))
+				}
+			}
+
+			if !result.OK {
+				os.Exit(1)
+			}
+		},
+	}
+	multiMergeTestCmd.Flags().BoolP("json", "J", false, "Output results as JSON")
+
+	return multiMergeTestCmd
 }
 
 func NewMultiMergeRemoveCommand() *cobra.Command {
