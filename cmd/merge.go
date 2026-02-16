@@ -77,6 +77,7 @@ func filterDuplicateBranches(existingBranches, newBranches []string) (filtered, 
 			duplicates = append(duplicates, b)
 		} else {
 			filtered = append(filtered, b)
+			existing[b] = true
 		}
 	}
 	return filtered, duplicates
