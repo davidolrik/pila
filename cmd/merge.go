@@ -65,6 +65,23 @@ func checkOngoingMerge(repo *git.LocalRepository) error {
 	return nil
 }
 
+// filterDuplicateBranches returns branches from newBranches that are not already
+// in existingBranches. Also returns the list of duplicates found.
+func filterDuplicateBranches(existingBranches, newBranches []string) (filtered, duplicates []string) {
+	existing := make(map[string]bool, len(existingBranches))
+	for _, b := range existingBranches {
+		existing[b] = true
+	}
+	for _, b := range newBranches {
+		if existing[b] {
+			duplicates = append(duplicates, b)
+		} else {
+			filtered = append(filtered, b)
+		}
+	}
+	return filtered, duplicates
+}
+
 func branchNameCompletions(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	repo, err := git.GetLocalRepository()
 	if err != nil {
