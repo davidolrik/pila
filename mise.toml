@@ -29,7 +29,7 @@ run = '''# mise tasks --local
 description = "🛠️  Build binary"
 run = [
     "go mod tidy",
-    '''go build -ldflags '-X pila.olrik.dev/internal/core.version={{ exec(command='git describe --tags --match "[0-9]*.[0-9]*.[0-9]*" 2>/dev/null') }}' -o pila .''',
+    '''go build -ldflags '-X pila.olrik.dev/internal/core.version={{ exec(command='git describe --tags --match "v[0-9]*.[0-9]*.[0-9]*" 2>/dev/null') }}' -o pila .''',
 ]
 
 [tasks."lint"]
