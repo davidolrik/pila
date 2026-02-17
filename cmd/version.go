@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"pila.olrik.dev/internal/core"
+	"go.olrik.dev/pila/internal/core"
 )
 
 func NewVersionCommand() *cobra.Command {

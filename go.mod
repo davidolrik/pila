@@ -1,6 +1,6 @@
-module pila.olrik.dev
+module go.olrik.dev/pila
 
-go 1.25.4
+go 1.25.7
 
 require (
 	github.com/fatih/color v1.18.0

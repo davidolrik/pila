@@ -12,7 +12,7 @@ builds:
       - CGO_ENABLED=0
     binary: pila
     ldflags:
-      - -s -w -X pila.olrik.dev/internal/core.version={{.Version}}
+      - -s -w -X go.olrik.dev/pila/internal/core.version={{.Version}}
     goos:
       - linux
       - darwin

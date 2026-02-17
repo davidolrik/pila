@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/jedib0t/go-pretty/v6/text"
-	"pila.olrik.dev/cmd"
+	"go.olrik.dev/pila/cmd"
 )
 
 func main() {
