@@ -4,7 +4,7 @@ import "runtime/debug"
 
 // version is set via ldflags at build time:
 //
-// -ldflags "-X pila.olrik.dev/internal/core.version=1.2.3"
+// -ldflags "-X pila.olrik.dev/internal/core.version=v1.2.3"
 var version string
 
 // Version is the resolved application version.
