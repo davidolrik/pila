@@ -313,6 +313,7 @@ type MultiMergeTestBranchResult struct {
 
 type MultiMergeTestResult struct {
 	OK            bool                          `json:"ok"`
+	Error         string                        `json:"error,omitempty"`
 	BranchResults []MultiMergeTestBranchResult `json:"branches"`
 }
 

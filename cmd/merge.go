@@ -454,6 +454,55 @@ func manifestBranchCompletions(cmd *cobra.Command, args []string, toComplete str
 	return suggestions, cobra.ShellCompDirectiveNoFileComp
 }
 
+func writeResultToFile(filename string, result *git.MultiMergeTestResult) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling result: %w", err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(filename, data, 0644); err != nil {
+		return fmt.Errorf("writing result file: %w", err)
+	}
+	return nil
+}
+
+func runMultiMergeTest() (*git.MultiMergeTestResult, error) {
+	repo, err := git.GetLocalRepository()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := checkOngoingMerge(repo); err != nil {
+		return nil, err
+	}
+
+	return repo.MultiMergeTest()
+}
+
+func printTestResult(result *git.MultiMergeTestResult) {
+	fmt.Println()
+	for _, br := range result.BranchResults {
+		switch br.Status {
+		case "clean":
+			fmt.Printf("%s %s\n", color.GreenString(br.Name), color.HiBlackString("(%s)", br.MergeType))
+		case "conflict":
+			fmt.Printf("%s %s\n", color.RedString(br.Name), color.HiBlackString("(%s)", br.MergeType))
+			for _, f := range br.ConflictingFiles {
+				fmt.Printf("  %s\n", f)
+			}
+		case "missing":
+			fmt.Printf("%s %s\n", color.YellowString(br.Name), color.HiBlackString("(missing)"))
+		}
+	}
+	fmt.Println()
+
+	if result.OK {
+		fmt.Println(color.GreenString("All branches merge cleanly."))
+	} else {
+		fmt.Println(color.RedString("Some branches have conflicts."))
+	}
+}
+
 func NewMultiMergeTestCommand() *cobra.Command {
 	multiMergeTestCmd := &cobra.Command{
 		Use:   "test",
@@ -463,55 +512,41 @@ func NewMultiMergeTestCommand() *cobra.Command {
 			merge cleanly and which have conflicts, without modifying any branches.
 		`)),
 		Run: func(cmd *cobra.Command, args []string) {
-			jsonOutput, _ := cmd.Flags().GetBool("json")
+			outputFile, _ := cmd.Flags().GetString("output")
 
-			// Get handle on local repo
-			repo, err := git.GetLocalRepository()
+			result, err := runMultiMergeTest()
 			if err != nil {
-				panic(err)
-			}
-
-			// Check if there's an ongoing merge
-			err = checkOngoingMerge(repo)
-			cobra.CheckErr(err)
-
-			result, err := repo.MultiMergeTest()
-			cobra.CheckErr(err)
-
-			if jsonOutput {
-				enc := json.NewEncoder(os.Stdout)
-				enc.SetIndent("", "  ")
-				enc.Encode(result)
-			} else {
-				fmt.Println()
-				for _, br := range result.BranchResults {
-					switch br.Status {
-					case "clean":
-						fmt.Printf("%s %s\n", color.GreenString(br.Name), color.HiBlackString("(%s)", br.MergeType))
-					case "conflict":
-						fmt.Printf("%s %s\n", color.RedString(br.Name), color.HiBlackString("(%s)", br.MergeType))
-						for _, f := range br.ConflictingFiles {
-							fmt.Printf("  %s\n", f)
-						}
-					case "missing":
-						fmt.Printf("%s %s\n", color.YellowString(br.Name), color.HiBlackString("(missing)"))
+				if result == nil {
+					result = &git.MultiMergeTestResult{
+						OK:            false,
+						Error:         err.Error(),
+						BranchResults: []git.MultiMergeTestBranchResult{},
 					}
 				}
-				fmt.Println()
+				if outputFile != "" {
+					if writeErr := writeResultToFile(outputFile, result); writeErr != nil {
+						fmt.Fprintf(os.Stderr, "Error writing result file: %v\n", writeErr)
+					}
+				}
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 
-				if result.OK {
-					fmt.Println(color.GreenString("All branches merge cleanly."))
-				} else {
-					fmt.Println(color.RedString("Some branches have conflicts."))
+			if outputFile != "" {
+				if writeErr := writeResultToFile(outputFile, result); writeErr != nil {
+					fmt.Fprintf(os.Stderr, "Error writing result file: %v\n", writeErr)
+					os.Exit(1)
 				}
 			}
+
+			printTestResult(result)
 
 			if !result.OK {
 				os.Exit(1)
 			}
 		},
 	}
-	multiMergeTestCmd.Flags().BoolP("json", "J", false, "Output results as JSON")
+	multiMergeTestCmd.Flags().StringP("output", "O", "", "Write JSON results to the specified file")
 
 	return multiMergeTestCmd
 }
