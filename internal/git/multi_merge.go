@@ -306,9 +306,10 @@ func (r *LocalRepository) MultiMergeAbort() error {
 
 type MultiMergeTestBranchResult struct {
 	Name             string   `json:"name"`
-	Status           string   `json:"status"`                      // "clean", "conflict", "missing"
+	Status           string   `json:"status"`                      // "clean", "conflict", "missing", "error"
 	MergeType        string   `json:"merge_type,omitempty"`        // "sequential" or "main-only"
 	ConflictingFiles []string `json:"conflicting_files,omitempty"` // only when Status == "conflict"
+	Error            string   `json:"error,omitempty"`             // only when Status == "error"
 }
 
 type MultiMergeTestResult struct {
@@ -394,7 +395,7 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 		}
 
 		r.Note("Test merge %s (%s)", reference.Name, mergeType)
-		_, mergeErr := r.ExecuteGitCommand("merge", "--no-ff", "--no-commit", branchNameToMerge)
+		mergeOutput, mergeErr := r.ExecuteGitCommand("merge", "--no-ff", "--no-commit", branchNameToMerge)
 
 		if mergeErr == nil {
 			// Clean merge
@@ -409,8 +410,8 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 				Status:    "clean",
 				MergeType: mergeType,
 			})
-		} else {
-			// Check if this is actually a merge conflict
+		} else if _, statErr := os.Stat(".git/MERGE_HEAD"); statErr == nil {
+			// MERGE_HEAD exists — this is a real merge conflict
 			conflictingFiles := []string{}
 			filesOutput, filesErr := r.ExecuteGitCommandQuiet("diff", "--name-only", "--diff-filter=U")
 			if filesErr == nil && filesOutput != "" {
@@ -425,6 +426,22 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 				Status:           "conflict",
 				MergeType:        mergeType,
 				ConflictingFiles: conflictingFiles,
+			})
+		} else {
+			// No MERGE_HEAD — git merge failed for a non-conflict reason
+			errMsg := strings.TrimSpace(mergeOutput)
+			if errMsg == "" {
+				errMsg = mergeErr.Error()
+			}
+			r.Err("merge error for %s: %s", reference.Name, errMsg)
+
+			sequential = false
+			result.OK = false
+			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
+				Name:      reference.Name,
+				Status:    "error",
+				MergeType: mergeType,
+				Error:     errMsg,
 			})
 		}
 	}

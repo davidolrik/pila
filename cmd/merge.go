@@ -492,6 +492,9 @@ func printTestResult(result *git.MultiMergeTestResult) {
 			}
 		case "missing":
 			fmt.Printf("%s %s\n", color.YellowString(br.Name), color.HiBlackString("(missing)"))
+		case "error":
+			fmt.Printf("%s %s\n", color.RedString(br.Name), color.HiBlackString("(error)"))
+			fmt.Printf("  %s\n", br.Error)
 		}
 	}
 	fmt.Println()
