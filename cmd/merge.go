@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -479,30 +480,30 @@ func runMultiMergeTest() (*git.MultiMergeTestResult, error) {
 	return repo.MultiMergeTest()
 }
 
-func printTestResult(result *git.MultiMergeTestResult) {
-	fmt.Println()
+func printTestResult(w io.Writer, result *git.MultiMergeTestResult) {
+	fmt.Fprintln(w)
 	for _, br := range result.BranchResults {
 		switch br.Status {
 		case "clean":
-			fmt.Printf("%s %s\n", color.GreenString(br.Name), color.HiBlackString("(%s)", br.MergeType))
+			fmt.Fprintf(w, "%s %s\n", color.GreenString(br.Name), color.HiBlackString("(%s)", br.MergeType))
 		case "conflict":
-			fmt.Printf("%s %s\n", color.RedString(br.Name), color.HiBlackString("(%s)", br.MergeType))
+			fmt.Fprintf(w, "%s %s\n", color.RedString(br.Name), color.HiBlackString("(%s)", br.MergeType))
 			for _, f := range br.ConflictingFiles {
-				fmt.Printf("  %s\n", f)
+				fmt.Fprintf(w, "  %s\n", f)
 			}
 		case "missing":
-			fmt.Printf("%s %s\n", color.YellowString(br.Name), color.HiBlackString("(missing)"))
+			fmt.Fprintf(w, "%s %s\n", color.YellowString(br.Name), color.HiBlackString("(missing)"))
 		case "error":
-			fmt.Printf("%s %s\n", color.RedString(br.Name), color.HiBlackString("(error)"))
-			fmt.Printf("  %s\n", br.Error)
+			fmt.Fprintf(w, "%s %s\n", color.RedString(br.Name), color.HiBlackString("(error)"))
+			fmt.Fprintf(w, "  %s\n", br.Error)
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(w)
 
 	if result.OK {
-		fmt.Println(color.GreenString("All branches merge cleanly."))
+		fmt.Fprintln(w, color.GreenString("All branches merge cleanly."))
 	} else {
-		fmt.Println(color.RedString("Some branches have conflicts."))
+		fmt.Fprintln(w, color.RedString("Some branches have conflicts."))
 	}
 }
 
@@ -542,7 +543,7 @@ func NewMultiMergeTestCommand() *cobra.Command {
 				}
 			}
 
-			printTestResult(result)
+			printTestResult(os.Stdout, result)
 
 			if !result.OK {
 				os.Exit(1)

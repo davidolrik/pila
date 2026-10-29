@@ -358,7 +358,6 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 		OK:            true,
 		BranchResults: []MultiMergeTestBranchResult{},
 	}
-	sequential := true
 
 	for _, reference := range manifest.References {
 		// Resolve branch name (prefer origin/<branch> over local)
@@ -384,27 +383,17 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 			continue
 		}
 
-		// If a prior branch conflicted, reset to main for a clean "branch vs main" test
-		if !sequential {
-			r.ExecuteGitCommandQuiet("reset", "--hard", fmt.Sprintf("origin/%s", mainBranchName))
-		}
-
+		// Every branch is merged onto the stack of previously clean branches.
+		// A conflicting branch is aborted and left out of the stack, so the
+		// branches after it are still tested against everything that did merge.
 		mergeType := "sequential"
-		if !sequential {
-			mergeType = "main-only"
-		}
 
 		r.Note("Test merge %s (%s)", reference.Name, mergeType)
 		mergeOutput, mergeErr := r.ExecuteGitCommand("merge", "--no-ff", "--no-commit", branchNameToMerge)
 
 		if mergeErr == nil {
-			// Clean merge
-			if sequential {
-				// Commit to advance the base for subsequent branches
-				r.ExecuteGitCommandQuiet("commit", "-m", fmt.Sprintf("test merge %s", reference.Name))
-			} else {
-				r.ExecuteGitCommandQuiet("merge", "--abort")
-			}
+			// Clean merge, commit to advance the stack for subsequent branches
+			r.ExecuteGitCommandQuiet("commit", "-m", fmt.Sprintf("test merge %s", reference.Name))
 			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
 				Name:      reference.Name,
 				Status:    "clean",
@@ -419,7 +408,6 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 			}
 
 			r.ExecuteGitCommandQuiet("merge", "--abort")
-			sequential = false
 			result.OK = false
 			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
 				Name:             reference.Name,
@@ -435,7 +423,6 @@ func (r *LocalRepository) MultiMergeTest() (*MultiMergeTestResult, error) {
 			}
 			r.Err("merge error for %s: %s", reference.Name, errMsg)
 
-			sequential = false
 			result.OK = false
 			result.BranchResults = append(result.BranchResults, MultiMergeTestBranchResult{
 				Name:      reference.Name,
